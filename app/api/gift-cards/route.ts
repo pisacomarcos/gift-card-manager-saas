@@ -1,12 +1,14 @@
 import { NextResponse } from "next/server"
-import { prisma } from "@/lib/prisma"
+import { supabase } from "@/lib/supabase"
 
 export async function GET() {
   try {
-    await prisma.$connect();
-    const giftCards = await prisma.giftCard.findMany({
-      orderBy: { createdAt: 'desc' }
-    });
+    const { data: giftCards, error } = await supabase
+      .from('gift_cards')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    if (error) throw error;
     
     return NextResponse.json({ 
       status: 'success', 
@@ -18,22 +20,25 @@ export async function GET() {
       status: 'error', 
       message: error instanceof Error ? error.message : 'Error de conexión con la base de datos' 
     }, { status: 500 });
-  } finally {
-    await prisma.$disconnect();
   }
 }
 
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const giftCard = await prisma.giftCard.create({
-      data: {
+    const { data: giftCard, error } = await supabase
+      .from('gift_cards')
+      .insert([{
         ...body,
         code: body.code || `GC-${Date.now()}`,
         status: body.status || "ACTIVE",
-        createdAt: new Date()
-      }
-    });
+        created_at: new Date().toISOString()
+      }])
+      .select()
+      .single();
+
+    if (error) throw error;
+
     return NextResponse.json({ 
       status: 'success', 
       data: giftCard 
@@ -44,4 +49,4 @@ export async function POST(request: Request) {
       message: error instanceof Error ? error.message : 'Error desconocido' 
     }, { status: 500 });
   }
-} 
+}
